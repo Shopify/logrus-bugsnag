@@ -1,5 +1,7 @@
 ## logrus-bugsnag
 
+[![Build Status](https://travis-ci.org/Shopify/logrus-bugsnag.svg)](https://travis-ci.org/Shopify/logrus-bugsnag)
+
 logrus-bugsnag is a hook that allows [Logrus](https://github.com/Sirupsen/logrus) to interface with [Bugsnag](https://bugsnag.com).
 
 #### Usage
