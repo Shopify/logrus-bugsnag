@@ -54,7 +54,11 @@ func (hook *bugsnagHook) Fire(entry *logrus.Entry) error {
 	}
 
 	errWithStack := bugsnag_errors.New(notifyErr, skipStackFrames)
-	bugsnagErr := bugsnag.Notify(errWithStack)
+	metadata := bugsnag.MetaData{}
+	for f, v := range entry.Data {
+		metadata.Add("logrus", f, v)
+	}
+	bugsnagErr := bugsnag.Notify(errWithStack, metadata)
 	if bugsnagErr != nil {
 		return ErrBugsnagSendFailed{bugsnagErr}
 	}
