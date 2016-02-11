@@ -22,7 +22,6 @@ type stackFrame struct {
 type exception struct {
 	Message    string       `json:"message"`
 	Stacktrace []stackFrame `json:"stacktrace"`
-	Cat        string       `json:"cat"`
 }
 type notice struct {
 	Events []struct {
@@ -60,7 +59,6 @@ func TestNoticeReceived(t *testing.T) {
 
 	log.WithFields(logrus.Fields{
 		"error": errors.New(expectedMsg),
-		"cat":   "fish",
 	}).Error("Bugsnag will not see this string")
 
 	select {
@@ -68,9 +66,6 @@ func TestNoticeReceived(t *testing.T) {
 		message := received.Message
 		if message != expectedMsg {
 			t.Errorf("Unexpected message received: %s", received)
-		}
-		if received.Cat != "fish" {
-			t.Errorf("Unexpected cat received: %s", received.Cat)
 		}
 		if len(received.Stacktrace) < 1 {
 			t.Error("Bugsnag error does not have a stack trace")

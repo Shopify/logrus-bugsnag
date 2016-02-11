@@ -2,6 +2,7 @@ package logrus_bugsnag
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/bugsnag/bugsnag-go"
@@ -46,11 +47,11 @@ const skipStackFrames = 4
 // "error" field (or the Message if the error isn't present) and sends it off.
 func (hook *bugsnagHook) Fire(entry *logrus.Entry) error {
 	var notifyErr error
-	var errorClass *bugsnag.ErrorClass
+	var errorClass bugsnag.ErrorClass
 	err, ok := entry.Data["error"].(error)
 	if ok {
 		notifyErr = err
-		errorClass = &bugsnag.ErrorClass{entry.Message}
+		errorClass = bugsnag.ErrorClass{Name: entry.Message}
 	} else {
 		notifyErr = errors.New(entry.Message)
 	}
@@ -58,14 +59,10 @@ func (hook *bugsnagHook) Fire(entry *logrus.Entry) error {
 	errWithStack := bugsnag_errors.New(notifyErr, skipStackFrames)
 	metadata := bugsnag.MetaData{}
 	for f, v := range entry.Data {
-		metadata.Add("logrus", f, v)
+		metadata.Add("logrus", f, fmt.Sprintf("%+v", v))
 	}
 	var bugsnagErr error
-	if errorClass != nil {
-		bugsnagErr = bugsnag.Notify(errWithStack, metadata)
-	} else {
-		bugsnagErr = bugsnag.Notify(errWithStack, metadata, errorClass)
-	}
+	bugsnagErr = bugsnag.Notify(errWithStack, metadata, errorClass)
 	if bugsnagErr != nil {
 		return ErrBugsnagSendFailed{bugsnagErr}
 	}
