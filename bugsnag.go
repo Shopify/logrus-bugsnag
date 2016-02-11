@@ -46,9 +46,11 @@ const skipStackFrames = 4
 // "error" field (or the Message if the error isn't present) and sends it off.
 func (hook *bugsnagHook) Fire(entry *logrus.Entry) error {
 	var notifyErr error
+	var errorClass *bugsnag.ErrorClass
 	err, ok := entry.Data["error"].(error)
 	if ok {
 		notifyErr = err
+		errorClass = &bugsnag.ErrorClass{entry.Message}
 	} else {
 		notifyErr = errors.New(entry.Message)
 	}
@@ -58,7 +60,11 @@ func (hook *bugsnagHook) Fire(entry *logrus.Entry) error {
 	for f, v := range entry.Data {
 		metadata.Add("logrus", f, v)
 	}
-	bugsnagErr := bugsnag.Notify(errWithStack, metadata)
+	if errorClass != nil {
+		bugsnagErr := bugsnag.Notify(errWithStack, metadata)
+	} else {
+		bugsnagErr := bugsnag.Notify(errWithStack, metadata, errorClass)
+	}
 	if bugsnagErr != nil {
 		return ErrBugsnagSendFailed{bugsnagErr}
 	}
