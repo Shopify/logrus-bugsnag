@@ -60,10 +60,11 @@ func (hook *bugsnagHook) Fire(entry *logrus.Entry) error {
 	for f, v := range entry.Data {
 		metadata.Add("logrus", f, v)
 	}
+	var bugsnagErr error
 	if errorClass != nil {
-		bugsnagErr := bugsnag.Notify(errWithStack, metadata)
+		bugsnagErr = bugsnag.Notify(errWithStack, metadata)
 	} else {
-		bugsnagErr := bugsnag.Notify(errWithStack, metadata, errorClass)
+		bugsnagErr = bugsnag.Notify(errWithStack, metadata, errorClass)
 	}
 	if bugsnagErr != nil {
 		return ErrBugsnagSendFailed{bugsnagErr}
