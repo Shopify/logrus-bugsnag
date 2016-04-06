@@ -23,15 +23,22 @@ type exception struct {
 	Message    string       `json:"message"`
 	Stacktrace []stackFrame `json:"stacktrace"`
 }
+
+type event struct {
+	Exceptions []exception      `json:"exceptions"`
+	Metadata   bugsnag.MetaData `json:"metaData"`
+}
+
 type notice struct {
-	Events []struct {
-		Exceptions []exception `json:"exceptions"`
-	} `json:"events"`
+	Events []event `json:"events"`
 }
 
 func TestNoticeReceived(t *testing.T) {
-	msg := make(chan exception, 1)
-	expectedMsg := "foo"
+	c := make(chan event, 1)
+	expectedMessage := "foo"
+	expectedMetadataLen := 3
+	expectedFields := []string{"animal", "size", "omg"}
+	expectedValues := []interface{}{"walrus", float64(9009), true}
 
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var notice notice
@@ -39,9 +46,9 @@ func TestNoticeReceived(t *testing.T) {
 		if err := json.Unmarshal(data, &notice); err != nil {
 			t.Error(err)
 		}
-		_ = r.Body.Close()
+		r.Body.Close()
 
-		msg <- notice.Events[0].Exceptions[0]
+		c <- notice.Events[0]
 	}))
 	defer ts.Close()
 
@@ -58,22 +65,49 @@ func TestNoticeReceived(t *testing.T) {
 	log.Hooks.Add(hook)
 
 	log.WithFields(logrus.Fields{
-		"error": errors.New(expectedMsg),
+		"error":  errors.New(expectedMessage),
+		"animal": "walrus",
+		"size":   9009,
+		"omg":    true,
 	}).Error("Bugsnag will not see this string")
 
 	select {
-	case received := <-msg:
-		message := received.Message
-		if message != expectedMsg {
-			t.Errorf("Unexpected message received: %s", received)
+	case event := <-c:
+		exception := event.Exceptions[0]
+		if exception.Message != expectedMessage {
+			t.Errorf("Unexpected message received: got %q, expected %q", exception.Message, expectedMessage)
 		}
-		if len(received.Stacktrace) < 1 {
+
+		if len(exception.Stacktrace) < 1 {
 			t.Error("Bugsnag error does not have a stack trace")
 		}
-		topFrame := received.Stacktrace[0]
-		if topFrame.Method != "TestNoticeReceived" {
-			t.Errorf("Unexpected method on top of call stack: '%s' (should be 'TestNoticeReceived')", topFrame.Method)
+
+		metadata, ok := event.Metadata["metadata"]
+		if !ok {
+			t.Error("Expected a Metadata field to be present in the bugsnag metadata")
 		}
+
+		if ok && len(metadata) != expectedMetadataLen {
+			t.Error("Unexpected metadata length, got %d, expected %d", len(metadata), expectedMetadataLen)
+		}
+
+		for idx, field := range expectedFields {
+			val, ok := metadata[field]
+			if !ok {
+				t.Errorf("Expected field %q not found", field)
+			}
+
+			if val != expectedValues[idx] {
+				t.Errorf("For field %q, found value %v, expected value %v", field, val, expectedValues[idx])
+			}
+		}
+
+		topFrame := exception.Stacktrace[0]
+		if topFrame.Method != "TestNoticeReceived" {
+			t.Errorf("Unexpected method on top of call stack: got %q, expected %q", topFrame.Method,
+				"TestNoticeReceived")
+		}
+
 	case <-time.After(time.Second):
 		t.Error("Timed out; no notice received by Bugsnag API")
 	}
