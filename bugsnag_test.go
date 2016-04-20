@@ -1,4 +1,4 @@
-package logrus_bugsnag
+package logrus_bugsnag_test
 
 import (
 	"encoding/json"
@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Shopify/logrus-bugsnag"
 	"github.com/Sirupsen/logrus"
 	"github.com/bugsnag/bugsnag-go"
 )
@@ -52,14 +53,14 @@ func TestNoticeReceived(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	hook := &bugsnagHook{}
-
 	bugsnag.Configure(bugsnag.Configuration{
 		Endpoint:     ts.URL,
 		ReleaseStage: "production",
 		APIKey:       "12345678901234567890123456789012",
 		Synchronous:  true,
 	})
+
+	hook, _ := logrus_bugsnag.NewBugsnagHook()
 
 	log := logrus.New()
 	log.Hooks.Add(hook)
@@ -111,4 +112,20 @@ func TestNoticeReceived(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Error("Timed out; no notice received by Bugsnag API")
 	}
+
+	// will generate a different stacktrace compared to log.WithFields().Error()
+	log.Errorf("Another error")
+
+	select {
+	case event := <-c:
+		topFrame := event.Exceptions[0].Stacktrace[0]
+		if topFrame.Method != "TestNoticeReceived" {
+			t.Errorf("Unexpected method on top of call stack: got %q, expected %q", topFrame.Method,
+				"TestNoticeReceived")
+		}
+
+	case <-time.After(time.Second):
+		t.Error("Timed out; no notice received by Bugsnag API")
+	}
+
 }

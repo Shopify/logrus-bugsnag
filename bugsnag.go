@@ -39,9 +39,6 @@ func NewBugsnagHook() (*bugsnagHook, error) {
 	return &bugsnagHook{}, nil
 }
 
-// skipStackFrames skips logrus stack frames before logging to Bugsnag.
-const skipStackFrames = 4
-
 // Fire forwards an error to Bugsnag. Given a logrus.Entry, it extracts the
 // "error" field (or the Message if the error isn't present) and sends it off.
 func (hook *bugsnagHook) Fire(entry *logrus.Entry) error {
@@ -61,6 +58,7 @@ func (hook *bugsnagHook) Fire(entry *logrus.Entry) error {
 		}
 	}
 
+	skipStackFrames := calcSkipStackFrames(bugsnag_errors.New(notifyErr, 0))
 	errWithStack := bugsnag_errors.New(notifyErr, skipStackFrames)
 	bugsnagErr := bugsnag.Notify(errWithStack, metadata)
 	if bugsnagErr != nil {
@@ -78,4 +76,23 @@ func (hook *bugsnagHook) Levels() []logrus.Level {
 		logrus.FatalLevel,
 		logrus.PanicLevel,
 	}
+}
+
+const (
+	logrusPkg        = "github.com/Sirupsen/logrus"
+	logrusBugsnagPkg = "github.com/Shopify/logrus-bugsnag"
+)
+
+// calcSkipStackFrames calculates the offset to first stackframe that does
+// not belong to logrus or logrus-bugsnag.
+//
+// We do this dynamically because calling log.WithFields().Error(),
+// log.Error() and log.Errorf() generates different stracktrace lengths.
+func calcSkipStackFrames(err *bugsnag_errors.Error) int {
+	for i, stackFrame := range err.StackFrames() {
+		if stackFrame.Package != logrusPkg && stackFrame.Package != logrusBugsnagPkg {
+			return i
+		}
+	}
+	return 0
 }
