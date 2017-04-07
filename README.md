@@ -8,7 +8,7 @@ logrus-bugsnag is a hook that allows [Logrus](https://github.com/sirupsen/logrus
 
 ```go
 import (
-  log "github.com/sirupsen/logrus"
+  log "github.com/Sirupsen/logrus"
   "github.com/Shopify/logrus-bugsnag"
   bugsnag "github.com/bugsnag/bugsnag-go"
 )
