@@ -2,6 +2,7 @@ package logrus_bugsnag
 
 import (
 	"errors"
+	"strings"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/bugsnag/bugsnag-go"
@@ -79,8 +80,8 @@ func (hook *bugsnagHook) Levels() []logrus.Level {
 }
 
 const (
-	logrusPkg        = "github.com/Sirupsen/logrus"
-	logrusBugsnagPkg = "github.com/Shopify/logrus-bugsnag"
+	logrusPkg        = "github.com/sirupsen/logrus"
+	logrusBugsnagPkg = "github.com/shopify/logrus-bugsnag"
 )
 
 // calcSkipStackFrames calculates the offset to first stackframe that does
@@ -90,7 +91,8 @@ const (
 // log.Error() and log.Errorf() generates different stracktrace lengths.
 func calcSkipStackFrames(err *bugsnag_errors.Error) int {
 	for i, stackFrame := range err.StackFrames() {
-		if stackFrame.Package != logrusPkg && stackFrame.Package != logrusBugsnagPkg {
+		stackFramePackage := strings.ToLower(stackFrame.Package)
+		if stackFramePackage != logrusPkg && stackFramePackage != logrusBugsnagPkg {
 			return i
 		}
 	}
