@@ -1,4 +1,4 @@
-package logrus_bugsnag
+package logrus_bugsnag_test
 
 import (
 	"encoding/json"
@@ -6,10 +6,12 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"regexp"
 	"testing"
 	"time"
 
-	"github.com/sirupsen/logrus"
+	"github.com/Shopify/logrus-bugsnag"
+	"github.com/Sirupsen/logrus"
 	"github.com/bugsnag/bugsnag-go"
 )
 
@@ -52,8 +54,6 @@ func TestNoticeReceived(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	hook := &bugsnagHook{}
-
 	bugsnag.Configure(bugsnag.Configuration{
 		Endpoint:     ts.URL,
 		ReleaseStage: "production",
@@ -61,54 +61,77 @@ func TestNoticeReceived(t *testing.T) {
 		Synchronous:  true,
 	})
 
+	hook, _ := logrus_bugsnag.NewBugsnagHook()
+
 	log := logrus.New()
 	log.Hooks.Add(hook)
 
-	log.WithFields(logrus.Fields{
-		"error":  errors.New(expectedMessage),
-		"animal": "walrus",
-		"size":   9009,
-		"omg":    true,
-	}).Error("Bugsnag will not see this string")
+	t.Run("log.WithFields", func(t *testing.T) {
+		log.WithFields(logrus.Fields{
+			"error":  errors.New(expectedMessage),
+			"animal": "walrus",
+			"size":   9009,
+			"omg":    true,
+		}).Error("Bugsnag will not see this string")
 
-	select {
-	case event := <-c:
-		exception := event.Exceptions[0]
-		if exception.Message != expectedMessage {
-			t.Errorf("Unexpected message received: got %q, expected %q", exception.Message, expectedMessage)
-		}
+		select {
+		case event := <-c:
+			exception := event.Exceptions[0]
+			if exception.Message != expectedMessage {
+				t.Errorf("Unexpected message received: got %q, expected %q", exception.Message, expectedMessage)
+			}
 
-		if len(exception.Stacktrace) < 1 {
-			t.Error("Bugsnag error does not have a stack trace")
-		}
+			if len(exception.Stacktrace) < 1 {
+				t.Error("Bugsnag error does not have a stack trace")
+			}
 
-		metadata, ok := event.Metadata["metadata"]
-		if !ok {
-			t.Error("Expected a Metadata field to be present in the bugsnag metadata")
-		}
-
-		if ok && len(metadata) != expectedMetadataLen {
-			t.Error("Unexpected metadata length, got %d, expected %d", len(metadata), expectedMetadataLen)
-		}
-
-		for idx, field := range expectedFields {
-			val, ok := metadata[field]
+			metadata, ok := event.Metadata["metadata"]
 			if !ok {
-				t.Errorf("Expected field %q not found", field)
+				t.Error("Expected a Metadata field to be present in the bugsnag metadata")
 			}
 
-			if val != expectedValues[idx] {
-				t.Errorf("For field %q, found value %v, expected value %v", field, val, expectedValues[idx])
+			if ok && len(metadata) != expectedMetadataLen {
+				t.Error("Unexpected metadata length, got %d, expected %d", len(metadata), expectedMetadataLen)
 			}
-		}
 
-		topFrame := exception.Stacktrace[0]
-		if topFrame.Method != "TestNoticeReceived" {
-			t.Errorf("Unexpected method on top of call stack: got %q, expected %q", topFrame.Method,
-				"TestNoticeReceived")
-		}
+			for idx, field := range expectedFields {
+				val, ok := metadata[field]
+				if !ok {
+					t.Errorf("Expected field %q not found", field)
+				}
 
-	case <-time.After(time.Second):
-		t.Error("Timed out; no notice received by Bugsnag API")
-	}
+				if val != expectedValues[idx] {
+					t.Errorf("For field %q, found value %v, expected value %v", field, val, expectedValues[idx])
+				}
+			}
+
+			topFrame := exception.Stacktrace[0]
+			match, _ := regexp.MatchString("^TestNoticeReceived", topFrame.Method)
+			if !match {
+				t.Errorf("Unexpected method on top of call stack: got %q, expected %q", topFrame.Method,
+					"TestNoticeReceived")
+			}
+
+		case <-time.After(time.Second):
+			t.Error("Timed out; no notice received by Bugsnag API")
+		}
+	})
+
+	t.Run("log.Errorf", func(t *testing.T) {
+		// will generate a different stacktrace compared to log.WithFields().Error()
+		log.Errorf("Another error")
+
+		select {
+		case event := <-c:
+			topFrame := event.Exceptions[0].Stacktrace[0]
+			match, _ := regexp.MatchString("^TestNoticeReceived", topFrame.Method)
+			if !match {
+				t.Errorf("Unexpected method on top of call stack: got %q, expected %q", topFrame.Method,
+					"TestNoticeReceived")
+			}
+
+		case <-time.After(time.Second):
+			t.Error("Timed out; no notice received by Bugsnag API")
+		}
+	})
 }
