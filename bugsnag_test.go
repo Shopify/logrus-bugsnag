@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sirupsen/logrus"
+	"github.com/Sirupsen/logrus"
 	"github.com/bugsnag/bugsnag-go"
 )
 
