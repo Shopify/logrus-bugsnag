@@ -88,7 +88,7 @@ func TestNoticeReceived(t *testing.T) {
 		}
 
 		if ok && len(metadata) != expectedMetadataLen {
-			t.Error("Unexpected metadata length, got %d, expected %d", len(metadata), expectedMetadataLen)
+			t.Errorf("Unexpected metadata length, got %d, expected %d", len(metadata), expectedMetadataLen)
 		}
 
 		for idx, field := range expectedFields {
