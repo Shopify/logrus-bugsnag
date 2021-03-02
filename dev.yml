@@ -1,7 +1,7 @@
 name: logrus-bugsnag
 
 up:
-  - go: 1.6.2
+  - go: 1.16
 
 commands:
   test:

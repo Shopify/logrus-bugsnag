@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/bugsnag/bugsnag-go/v2"
 	"github.com/sirupsen/logrus"
-	"github.com/bugsnag/bugsnag-go"
 )
 
 type stackFrame struct {
@@ -55,7 +55,10 @@ func TestNoticeReceived(t *testing.T) {
 	hook := &bugsnagHook{}
 
 	bugsnag.Configure(bugsnag.Configuration{
-		Endpoint:     ts.URL,
+		Endpoints: bugsnag.Endpoints{
+			Notify:   ts.URL,
+			Sessions: ts.URL,
+		},
 		ReleaseStage: "production",
 		APIKey:       "12345678901234567890123456789012",
 		Synchronous:  true,
@@ -88,7 +91,7 @@ func TestNoticeReceived(t *testing.T) {
 		}
 
 		if ok && len(metadata) != expectedMetadataLen {
-			t.Error("Unexpected metadata length, got %d, expected %d", len(metadata), expectedMetadataLen)
+			t.Errorf("Unexpected metadata length, got %d, expected %d", len(metadata), expectedMetadataLen)
 		}
 
 		for idx, field := range expectedFields {
