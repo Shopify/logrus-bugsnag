@@ -64,9 +64,10 @@ func TestNoticeReceived(t *testing.T) {
 			Notify:   ts.URL,
 			Sessions: ts.URL,
 		},
-		ReleaseStage: "production",
-		APIKey:       "12345678901234567890123456789012",
-		Synchronous:  true,
+		ReleaseStage:        "production",
+		APIKey:              "12345678901234567890123456789012",
+		Synchronous:         true,
+		AutoCaptureSessions: false,
 	})
 
 	log := logrus.New()
