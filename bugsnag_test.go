@@ -1,123 +1,159 @@
 package logrus_bugsnag
 
 import (
-	"encoding/json"
+	"bytes"
 	"errors"
 	"io"
 	"net/http"
-	"net/http/httptest"
 	"testing"
 	"time"
 
 	"github.com/bugsnag/bugsnag-go/v2"
 	"github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/assert"
 )
 
-type stackFrame struct {
-	Method     string `json:"method"`
-	File       string `json:"file"`
-	LineNumber int    `json:"lineNumber"`
+// Copied from bugsnag tests
+
+var roundTripper = &nilRoundTripper{}
+var events = make(chan *bugsnag.Event, 10)
+var testAPIKey = "12345678901234567890123456789012"
+var errTest = errors.New("test error")
+
+type nilRoundTripper struct{}
+
+func (rt *nilRoundTripper) RoundTrip(_ *http.Request) (*http.Response, error) {
+	return &http.Response{
+		Body:       io.NopCloser(bytes.NewReader(nil)),
+		StatusCode: http.StatusOK,
+	}, nil
 }
 
-type exception struct {
-	Message    string       `json:"message"`
-	Stacktrace []stackFrame `json:"stacktrace"`
-}
-
-type event struct {
-	Exceptions []exception      `json:"exceptions"`
-	Metadata   bugsnag.MetaData `json:"metaData"`
-}
-
-type notice struct {
-	Events []event `json:"events"`
-}
-
-func TestNoticeReceived(t *testing.T) {
-	c := make(chan event, 1)
-	expectedMessage := "foo"
-	expectedMetadataLen := 3
-	expectedFields := []string{"animal", "size", "omg"}
-	expectedValues := []interface{}{"walrus", float64(9009), true}
-
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var notice notice
-		data, err := io.ReadAll(r.Body)
-		if err != nil {
-			t.Error(err)
-		}
-		if err := json.Unmarshal(data, &notice); err != nil {
-			t.Error(err)
-		}
-		if err := r.Body.Close(); err != nil {
-			t.Error(err)
-		}
-
-		c <- notice.Events[0]
-	}))
-	defer ts.Close()
-
-	hook := &Hook{}
+func init() {
+	l := logrus.New()
+	l.Out = io.Discard
 
 	bugsnag.Configure(bugsnag.Configuration{
+		APIKey: testAPIKey,
 		Endpoints: bugsnag.Endpoints{
-			Notify:   ts.URL,
-			Sessions: ts.URL,
+			Notify: "",
 		},
-		ReleaseStage:        "production",
-		APIKey:              "12345678901234567890123456789012",
 		Synchronous:         true,
+		Transport:           roundTripper,
+		Logger:              l,
 		AutoCaptureSessions: false,
 	})
+	bugsnag.OnBeforeNotify(func(event *bugsnag.Event, config *bugsnag.Configuration) error {
+		events <- event
+		return nil
+	})
+}
 
-	log := logrus.New()
-	log.Hooks.Add(hook)
+func TestNewBugsnagHook(t *testing.T) {
+	l := logrus.New()
+	l.Out = io.Discard
 
-	log.WithFields(logrus.Fields{
-		"error":  errors.New(expectedMessage),
-		"animal": "walrus",
-		"size":   9009,
-		"omg":    true,
-	}).Error("Bugsnag will not see this string")
+	hook, err := NewBugsnagHook()
+	assert.NoError(t, err)
+	l.Hooks.Add(hook)
+
+	t.Run("inline error", func(t *testing.T) {
+		t.Run("inline logging", func(t *testing.T) {
+			l.WithError(err).Error(errors.New("foo"))
+
+			event := readEvent(t)
+			assert.Equal(t, "*errors.errorString", event.ErrorClass)
+			assert.Equal(t, "foo", event.Message)
+			assert.NotEqual(t, "triggerError", event.Stacktrace[0].Method)
+			assert.Contains(t, event.Stacktrace[0].File, "bugsnag_test.go")
+		})
+
+		t.Run("other function logging", func(t *testing.T) {
+			triggerError(l, errors.New("foo"))
+
+			event := readEvent(t)
+			assert.Equal(t, "*errors.errorString", event.ErrorClass)
+			assert.Equal(t, "foo", event.Message)
+			assert.Equal(t, "triggerError", event.Stacktrace[0].Method)
+		})
+	})
+
+	t.Run("prebuilt error", func(t *testing.T) {
+		t.Run("inline logging", func(t *testing.T) {
+			l.WithError(errTest).WithField("foo", "bar").Error("test")
+
+			event := readEvent(t)
+			assert.Equal(t, "*errors.errorString", event.ErrorClass)
+			assert.Equal(t, "test error", event.Message)
+			assert.Equal(t, "bar", event.MetaData["metadata"]["foo"])
+			assert.NotEqual(t, "triggerError", event.Stacktrace[0].Method)
+			assert.Contains(t, event.Stacktrace[0].File, "bugsnag_test.go")
+		})
+
+		t.Run("other function logging", func(t *testing.T) {
+			triggerError(l, errTest)
+
+			event := readEvent(t)
+			assert.Equal(t, "*errors.errorString", event.ErrorClass)
+			assert.Equal(t, "test error", event.Message)
+			assert.Equal(t, "bar", event.MetaData["metadata"]["foo"])
+			assert.Equal(t, "triggerError", event.Stacktrace[0].Method)
+		})
+	})
+
+	t.Run("panic", func(t *testing.T) {
+		t.Run("log panic", func(t *testing.T) {
+			func() {
+				defer func() {
+					_ = recover()
+				}()
+
+				l.WithField("foo", "bar").Panic("test panic")
+			}()
+
+			event := readEvent(t)
+			assert.Equal(t, "*errors.errorString", event.ErrorClass)
+			assert.Equal(t, "test panic", event.Message)
+			assert.Equal(t, "bar", event.MetaData["metadata"]["foo"])
+			assert.NotEqual(t, "triggerError", event.Stacktrace[0].Method)
+			assert.Contains(t, event.Stacktrace[0].File, "bugsnag_test.go")
+		})
+
+		t.Run("other function panic", func(t *testing.T) {
+			func() {
+				defer func() {
+					_ = recover()
+				}()
+
+				triggerPanic(l, "test panic")
+			}()
+
+			event := readEvent(t)
+			assert.Equal(t, "*errors.errorString", event.ErrorClass)
+			assert.Equal(t, "test panic", event.Message)
+			assert.Equal(t, "bar", event.MetaData["metadata"]["foo"])
+			assert.Equal(t, "triggerPanic", event.Stacktrace[0].Method)
+		})
+	})
+}
+
+func triggerError(l *logrus.Logger, err error) {
+	l.WithError(err).WithField("foo", "bar").Error("test")
+}
+
+func triggerPanic(l *logrus.Logger, msg string) {
+	l.WithField("foo", "bar").Panic(msg)
+}
+
+func readEvent(t *testing.T) *bugsnag.Event {
+	timer := time.NewTimer(1 * time.Second)
+	defer timer.Stop()
 
 	select {
-	case event := <-c:
-		exception := event.Exceptions[0]
-		if exception.Message != expectedMessage {
-			t.Errorf("Unexpected message received: got %q, expected %q", exception.Message, expectedMessage)
-		}
-
-		if len(exception.Stacktrace) < 1 {
-			t.Error("Bugsnag error does not have a stack trace")
-		}
-
-		metadata, ok := event.Metadata["metadata"]
-		if !ok {
-			t.Error("Expected a Metadata field to be present in the bugsnag metadata")
-		}
-
-		if ok && len(metadata) != expectedMetadataLen {
-			t.Errorf("Unexpected metadata length, got %d, expected %d", len(metadata), expectedMetadataLen)
-		}
-
-		for idx, field := range expectedFields {
-			val, ok := metadata[field]
-			if !ok {
-				t.Errorf("Expected field %q not found", field)
-			}
-
-			if val != expectedValues[idx] {
-				t.Errorf("For field %q, found value %v, expected value %v", field, val, expectedValues[idx])
-			}
-		}
-
-		topFrame := exception.Stacktrace[0]
-		if topFrame.Method != "TestNoticeReceived" {
-			t.Errorf("Unexpected method on top of call stack: got %q, expected %q", topFrame.Method,
-				"TestNoticeReceived")
-		}
-
-	case <-time.After(time.Second):
-		t.Error("Timed out; no notice received by Bugsnag API")
+	case <-timer.C:
+		t.Error("timeout waiting for event")
+		return nil
+	case e := <-events:
+		return e
 	}
 }
