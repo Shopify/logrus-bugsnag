@@ -8,7 +8,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-type bugsnagHook struct{}
+type Hook struct{}
 
 // ErrBugsnagUnconfigured is returned if NewBugsnagHook is called before
 // bugsnag.Configure. Bugsnag must be configured before the hook.
@@ -32,11 +32,11 @@ func (e ErrBugsnagSendFailed) Error() string {
 //
 // Entries that trigger an Error, Fatal or Panic should now include an "error"
 // field to send to Bugsnag.
-func NewBugsnagHook() (*bugsnagHook, error) {
+func NewBugsnagHook() (*Hook, error) {
 	if bugsnag.Config.APIKey == "" {
 		return nil, ErrBugsnagUnconfigured
 	}
-	return &bugsnagHook{}, nil
+	return &Hook{}, nil
 }
 
 // skipStackFrames skips logrus stack frames before logging to Bugsnag.
@@ -44,7 +44,7 @@ const skipStackFrames = 4
 
 // Fire forwards an error to Bugsnag. Given a logrus.Entry, it extracts the
 // "error" field (or the Message if the error isn't present) and sends it off.
-func (hook *bugsnagHook) Fire(entry *logrus.Entry) error {
+func (hook *Hook) Fire(entry *logrus.Entry) error {
 	var notifyErr error
 	err, ok := entry.Data["error"].(error)
 	if ok {
@@ -72,7 +72,7 @@ func (hook *bugsnagHook) Fire(entry *logrus.Entry) error {
 
 // Levels enumerates the log levels on which the error should be forwarded to
 // bugsnag: everything at or above the "Error" level.
-func (hook *bugsnagHook) Levels() []logrus.Level {
+func (hook *Hook) Levels() []logrus.Level {
 	return []logrus.Level{
 		logrus.ErrorLevel,
 		logrus.FatalLevel,
