@@ -3,7 +3,7 @@ package logrus_bugsnag
 import (
 	"encoding/json"
 	"errors"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -42,17 +42,22 @@ func TestNoticeReceived(t *testing.T) {
 
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var notice notice
-		data, _ := ioutil.ReadAll(r.Body)
+		data, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Error(err)
+		}
 		if err := json.Unmarshal(data, &notice); err != nil {
 			t.Error(err)
 		}
-		r.Body.Close()
+		if err := r.Body.Close(); err != nil {
+			t.Error(err)
+		}
 
 		c <- notice.Events[0]
 	}))
 	defer ts.Close()
 
-	hook := &bugsnagHook{}
+	hook := &Hook{}
 
 	bugsnag.Configure(bugsnag.Configuration{
 		Endpoints: bugsnag.Endpoints{

@@ -6,3 +6,5 @@ up:
 commands:
   test:
     run: go get -t ./... && go test ./...
+  style:
+    run: scripts/golangci-lint run
