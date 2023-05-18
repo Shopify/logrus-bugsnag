@@ -4,7 +4,7 @@ go 1.17
 
 require (
 	github.com/bugsnag/bugsnag-go/v2 v2.2.0
-	github.com/sirupsen/logrus v1.9.0
+	github.com/sirupsen/logrus v1.9.2
 	github.com/stretchr/testify v1.7.0
 )
 
