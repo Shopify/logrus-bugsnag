@@ -15,7 +15,7 @@ jobs:
 
     steps:
     - name: Checkout
-      uses: actions/checkout@v3.3.0
+      uses: actions/checkout@v4.1.7
 
     - name: golangci-lint
       uses: golangci/golangci-lint-action@v3.3.1
@@ -28,7 +28,7 @@ jobs:
 
     steps:
     - name: Checkout
-      uses: actions/checkout@v3.3.0
+      uses: actions/checkout@v4.1.7
 
     - uses: actions/setup-go@v3.5.0
       with:
@@ -58,7 +58,7 @@ jobs:
 
     steps:
     - name: Checkout
-      uses: actions/checkout@v3.3.0
+      uses: actions/checkout@v4.1.7
 
     - name: Setup go
       uses: actions/setup-go@v3.5.0
