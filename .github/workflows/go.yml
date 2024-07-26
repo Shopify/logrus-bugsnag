@@ -32,7 +32,7 @@ jobs:
 
     - uses: actions/setup-go@v3.5.0
       with:
-        go-version: '^1.17.1'
+        go-version: '^1.22.3'
 
     - name: Cache
       uses: actions/cache@v3.2.3
@@ -52,9 +52,7 @@ jobs:
     strategy:
       matrix:
         go-version:
-        - 1.17.x
-        - 1.18.x
-        - 1.19.x
+        - 1.22.x
 
     steps:
     - name: Checkout
