@@ -15,10 +15,10 @@ jobs:
 
     steps:
     - name: Checkout
-      uses: actions/checkout@v3.3.0
+      uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
 
     - name: golangci-lint
-      uses: golangci/golangci-lint-action@v3.3.1
+      uses: golangci/golangci-lint-action@0ad9a0988b3973e851ab0a07adf248ec2e100376 # v3.3.1
       with:
         version: v1.50.1
 
@@ -28,14 +28,14 @@ jobs:
 
     steps:
     - name: Checkout
-      uses: actions/checkout@v3.3.0
+      uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
 
-    - uses: actions/setup-go@v3.5.0
+    - uses: actions/setup-go@6edd4406fa81c3da01a34fa6f6343087c207a568 # v3.5.0
       with:
         go-version: '^1.17.1'
 
     - name: Cache
-      uses: actions/cache@v3.2.3
+      uses: actions/cache@58c146cc91c5b9e778e71775dfe9bf1442ad9a12 # v3.2.3
       with:
         path: ~/go/pkg/mod
         key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
@@ -43,7 +43,7 @@ jobs:
           ${{ runner.os }}-go-
 
     - name: go-tidy-check
-      uses: katexochen/go-tidy-check@v1.0.2
+      uses: katexochen/go-tidy-check@45731e0013a976d5d616d79007c7ba52de6ce542 # v1.0.2
 
   test:
     name: Go ${{ matrix.go-version }} test
@@ -58,15 +58,15 @@ jobs:
 
     steps:
     - name: Checkout
-      uses: actions/checkout@v3.3.0
+      uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
 
     - name: Setup go
-      uses: actions/setup-go@v3.5.0
+      uses: actions/setup-go@6edd4406fa81c3da01a34fa6f6343087c207a568 # v3.5.0
       with:
         go-version: ${{ matrix.go-version }}
 
     - name: Cache
-      uses: actions/cache@v3.2.3
+      uses: actions/cache@58c146cc91c5b9e778e71775dfe9bf1442ad9a12 # v3.2.3
       with:
         path: ~/go/pkg/mod
         key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
