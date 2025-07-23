@@ -4,7 +4,7 @@
 
 set -e
 
-VERSION="${VERSION:-"1.50.1"}"
+VERSION="${VERSION:-"1.64.8"}"
 VERSION_TAG="v${VERSION}"
 
 INSTALLER_URL="github.com/golangci/golangci-lint/cmd/golangci-lint"

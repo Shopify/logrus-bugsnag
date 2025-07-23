@@ -10,7 +10,9 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-type Hook struct{}
+type Hook struct {
+	levels []logrus.Level
+}
 
 // ErrBugsnagUnconfigured is returned if NewBugsnagHook is called before
 // bugsnag.Configure. Bugsnag must be configured before the hook.
@@ -27,6 +29,17 @@ func (e ErrBugsnagSendFailed) Error() string {
 	return "failed to send error to Bugsnag: " + e.err.Error()
 }
 
+// levelsAtOrAbove returns all log levels at or above the specified minimum level.
+func levelsAtOrAbove(minLevel logrus.Level) []logrus.Level {
+	var result []logrus.Level
+	for _, level := range logrus.AllLevels {
+		if level <= minLevel {
+			result = append(result, level)
+		}
+	}
+	return result
+}
+
 // NewBugsnagHook initializes a logrus hook which sends exceptions to an
 // exception-tracking service compatible with the Bugsnag API. Before using
 // this hook, you must call bugsnag.Configure(). The returned object should be
@@ -34,11 +47,21 @@ func (e ErrBugsnagSendFailed) Error() string {
 //
 // Entries that trigger an Error, Fatal or Panic should now include an "error"
 // field to send to Bugsnag.
-func NewBugsnagHook() (*Hook, error) {
+//
+// Optionally accepts a minimum level to specify the lowest log level that should trigger the hook.
+// If no level is provided, the hook.levels remains nil and defaults to Error, Fatal, and Panic.
+func NewBugsnagHook(minLevel ...logrus.Level) (*Hook, error) {
 	if bugsnag.Config.APIKey == "" {
 		return nil, ErrBugsnagUnconfigured
 	}
-	return &Hook{}, nil
+
+	hook := &Hook{}
+	if len(minLevel) > 0 {
+		hook.levels = levelsAtOrAbove(minLevel[0])
+	}
+	// if no level provided, hook.levels remains nil
+
+	return hook, nil
 }
 
 // Fire forwards an error to Bugsnag. Given a logrus.Entry, it extracts the
@@ -122,8 +145,11 @@ func findPanic() int {
 }
 
 // Levels enumerates the log levels on which the error should be forwarded to
-// bugsnag: everything at or above the "Error" level.
+// bugsnag: everything at or above the configured level.
 func (hook *Hook) Levels() []logrus.Level {
+	if hook.levels != nil {
+		return hook.levels
+	}
 	return []logrus.Level{
 		logrus.ErrorLevel,
 		logrus.FatalLevel,
