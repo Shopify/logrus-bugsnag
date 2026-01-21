@@ -10,7 +10,7 @@ logrus-bugsnag is a hook that allows [Logrus](https://github.com/sirupsen/logrus
 import (
   log "github.com/sirupsen/logrus"
   "github.com/Shopify/logrus-bugsnag"
-  bugsnag "github.com/bugsnag/bugsnag-go"
+  bugsnag "github.com/bugsnag/bugsnag-go/v2"
 )
 
 func init() {
